@@ -3,8 +3,9 @@ from fastapi import FastAPI,Query,HTTPException,status,Path,Form,Body,UploadFile
 import random
 import colorama
 from fastapi.responses import JSONResponse
-from typing import Optional
-
+from typing import Optional,List
+from dataclasses import dataclass
+from schemas import items_create,items_response
 
 #for_color's
 colorama.init()
@@ -27,10 +28,10 @@ name_list_example = [
 #opration_1
 @app.get("/")
 def elyasjoon():
-    return JSONResponse(content={"message","hello world!"},status_code=status.HTTP_202_ACCEPTED)
+    return 'hello world!'
 
 #opration_2
-@app.get("/names")
+@app.get("/names",response_model=list[items_response])
 def name_list():
     return name_list_example
 
@@ -42,11 +43,33 @@ def names_detail(item_id: int = Path()):
             return name
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Name not found")
 
+
+#dataclasses
+
+
+#@dataclass
+#class Item:
+ #   name: str
+ #   age: int
+#    price: float
+#    description: str | None = None
+#    tax: float | None = None
+
+
 #opration_4
-@app.post("/names",status_code=status.HTTP_201_CREATED)
-def names_create(name: str):
-    new_name = {"id": random.randint(1,1000), "name": name}
+@app.post(
+    "/names",
+    status_code=status.HTTP_201_CREATED,
+    response_model=items_response,
+)
+def names_create(item: items_create):
+    new_name = {
+        "id": random.randint(1, 1000),
+        "name": item.name
+    }
     name_list_example.append(new_name)
+    print(item)
+    print(item.model_dump())  # تبدیل به dict
     return new_name
 
 #opration_5
