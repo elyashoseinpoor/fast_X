@@ -1,11 +1,15 @@
 #libraris
-from fastapi import FastAPI,Query,HTTPException,status,Path,Form,Body,UploadFile
+from sqlalchemy.orm import Session
+from database import SessionLocal, engine, Base, get_db  # FIX 1
+from models import User, Order
+
+from fastapi import FastAPI, Query, HTTPException, status, Path, Form, Body, UploadFile, Depends  # FIX 2
 import random
 import colorama
-from fastapi.responses import JSONResponse
-from typing import Optional,List
+from fastapi.responses import JSONResponse, Response   # FIX 3
+from typing import Optional, List
 from dataclasses import dataclass
-from schemas import items_create,items_response
+from schemas import items_create, items_response
 
 #for_color's
 colorama.init()
@@ -42,20 +46,6 @@ def names_detail(item_id: int = Path()):
         if name["id"] == item_id:
             return name
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Name not found")
-
-
-#dataclasses
-
-
-#@dataclass
-#class Item:
- #   name: str
- #   age: int
-#    price: float
-#    description: str | None = None
-#    tax: float | None = None
-
-
 #opration_4
 @app.post(
     "/names",
@@ -69,7 +59,7 @@ def names_create(item: items_create):
     }
     name_list_example.append(new_name)
     print(item)
-    print(item.model_dump())  # تبدیل به dict
+    print(item.model_dump())
     return new_name
 
 #opration_5
@@ -81,15 +71,15 @@ def names_update(item_id: int, name: str):
             return {"message": f"Name with ID {item_id} updated successfully"}
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Name not found")
 
-
 #opration_6
 @app.delete("/names/{item_id}",status_code=status.HTTP_204_NO_CONTENT)
 def names_delete(item_id: int):
     for n in name_list_example:
         if n["id"] == item_id:
             name_list_example.remove(n)
-            return JSONResponse(content={"message": f"Name with ID {item_id} deleted successfully"},status_code=status.HTTP_204_NO_CONTENT)
+            return Response(status_code=status.HTTP_204_NO_CONTENT)   # FIX 3
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Name not found")
+
 
 #search_1
 @app.get("/search")
@@ -103,9 +93,7 @@ def search_jaber(q=None):
 
 #search_2
 @app.get("/search2/")
-async def read_items(
-    q: Optional[str] = Query(None, min_length=1)
-):
+async def read_items(q: Optional[str] = Query(None, min_length=1)):
     result = []
 
     if q:
@@ -113,4 +101,29 @@ async def read_items(
             if q.lower() in i["name"].lower():
                 result.append(i)
 
+    if result:   # FIX 4
+        return result
+
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Name not found")
+
+
+# DB endpoint
+@app.get("/users")
+def get_users(db: Session = Depends(get_db)):   # FIX 5
+    return db.query(User).all()
+
+
+@app.post("/seed-users")
+def create_users(db: Session = Depends(get_db)):
+    users = []
+    for i in range(5):
+        user = User(first_name=f"User{i}",email=f"user{i}@test.com")
+        # هر user چند order دارد
+        user.orders = [Order(title=f"Order-{i}-A"),Order(title=f"Order-{i}-B")]
+        db.add(user)
+        users.append(user)
+    db.commit()
+    # refresh برای گرفتن id ها
+    for u in users:
+        db.refresh(u)
+    return users
